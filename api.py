@@ -100,15 +100,18 @@ def process_hubspot_availability(
     return transformed_availability
 
 
-def fetch_hubspot_meeting_availability(HUBSPOT_API_KEY: str, slug: str, timezone: str) -> Dict[str, Any]:
-    if not HUBSPOT_API_KEY:
-        # This case should be handled by the calling endpoint ensuring API key exists
+def fetch_hubspot_meeting_availability(
+        hubspot_api_key: str,
+        slug: str, timezone: str) -> Dict[str, Any]:
+    if not hubspot_api_key:
         raise ValueError("HUBSPOT_API_KEY is not provided internally.")
 
-    url = f"https://api.hubapi.com/scheduler/v3/meetings/meeting-links/book/availability-page/{slug}?timezone={timezone}"
+    url = (f"https://api.hubapi.com"
+           f"/scheduler/v3/meetings/meeting-links/book/availability-page"
+           f"/{slug}?timezone={timezone}")
     headers = {
         "Accept": "application/json",
-        "Authorization": f"Bearer {HUBSPOT_API_KEY}"
+        "Authorization": f"Bearer {hubspot_api_key}"
     }
 
     try:
@@ -162,7 +165,8 @@ async def get_availability_endpoint(
 ):
     HUBSPOT_API_KEY_from_env = os.getenv("HUBSPOT_API_KEY")
     if not HUBSPOT_API_KEY_from_env:
-        raise HTTPException(status_code=500, detail="Server configuration error: HUBSPOT_API_KEY not set.")
+        raise HTTPException(status_code=500,
+                            detail="Server configuration error: HUBSPOT_API_KEY not set.")
 
     # Validate timezone early
     try:
