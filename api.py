@@ -10,9 +10,6 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-
-
-
 def convert_duration_ms_to_label(duration_ms_str: str) -> str:
     try:
         milliseconds = int(duration_ms_str)
