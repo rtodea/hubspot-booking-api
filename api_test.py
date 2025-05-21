@@ -9,6 +9,7 @@ class TestAvailabilityEndpoint(unittest.TestCase):
 
         self.availability_endpoint = f"{self.base_url}/availability"
         self.booking_endpoint = f"{self.base_url}/book"
+        self.echo_endpoint = f"{self.base_url}/echo"
 
     def test_availability_endpoint_returns_success(self):
         params = {
@@ -38,6 +39,15 @@ class TestAvailabilityEndpoint(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         booking = response.json()
         self.assertIsNotNone(booking)
+
+    def test_echo_endpoint_returns_success(self):
+
+        test_data = {"message": "test"}
+        response = requests.post(self.echo_endpoint, json=test_data)
+
+        self.assertEqual(response.status_code, 200)
+        echo_response = response.json()
+        self.assertEqual(echo_response['body'], test_data)
 
 
 if __name__ == '__main__':
