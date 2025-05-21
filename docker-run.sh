@@ -2,7 +2,7 @@
 docker pull roberttodea/hubspot-booking-api:latest
 
 docker run \
-  -p 8000:8000 \
+  -p 8080:8080 \
   --rm \
   --env-file ./.env \
   --name hubspot-booking-api \
