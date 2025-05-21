@@ -4,7 +4,7 @@ from typing import Optional, Dict, List, Any
 
 import pytz  # Required: pip install pytz
 import requests
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Request
 import json
 from typing import Optional
 from pydantic import BaseModel
@@ -338,6 +338,33 @@ async def book_meeting_endpoint(booking: BookingRequest):
                             detail="An unexpected error occurred while processing your booking request")
 
 
+@app.api_route("/echo", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], summary="Echo Request", description="Echoes back the request headers and body.")
+async def echo_request(request: Request):
+    body = await request.body()
+    # Try to decode body as JSON if content-type suggests it, otherwise return as bytes (or string)
+    content_type = request.headers.get("content-type")
+    decoded_body: Any
+    if body:
+        if content_type and "application/json" in content_type:
+            try:
+                decoded_body = await request.json()
+            except json.JSONDecodeError:
+                decoded_body = body.decode(errors="ignore") # Fallback to string if not valid JSON
+        else:
+            decoded_body = body.decode(errors="ignore") # Default to string decoding
+    else:
+        decoded_body = None
+
+    return {
+        "method": request.method,
+        "headers": dict(request.headers),
+        "query_params": dict(request.query_params),
+        "path_params": dict(request.path_params),
+        "client_host": request.client.host if request.client else None,
+        "body": decoded_body,
+    }
+
+
 # --- How to Run ---
 # 1. Save this code as `main.py` (or another name like `app.py`).
 # 2. Install dependencies:
@@ -351,6 +378,7 @@ async def book_meeting_endpoint(booking: BookingRequest):
 #    (Replace `main` with your Python filename if you named it differently).
 # 5. Access the API:
 #    - Endpoint: http://127.0.0.1:8000/availability?slug=your_slug&timezone=America/New_York
+#    - Echo Endpoint: http://127.0.0.1:8000/echo
 #    - Interactive API docs (Swagger UI): http://127.0.0.1:8000/docs
 #    - Alternative API docs (ReDoc): http://127.0.0.1:8000/redoc
 
