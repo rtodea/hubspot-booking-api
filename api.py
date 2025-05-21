@@ -158,8 +158,6 @@ async def get_availability_endpoint(
         slug: str = Query(..., min_length=1, description="The meeting link slug from HubSpot."),
         timezone: str = Query("America/Mexico_City",
                               description="Target timezone for displaying slots (e.g., 'America/New_York', 'Europe/London'). Must be an IANA timezone database name."),
-        apply_business_hours_filter: Optional[bool] = Query(False,
-                                                            description="Apply an additional server-side business hours filter (default: 9AM-5PM, Mon-Fri).")
 ):
     HUBSPOT_API_KEY_from_env = os.getenv("HUBSPOT_API_KEY")
     if not HUBSPOT_API_KEY_from_env:
@@ -179,7 +177,6 @@ async def get_availability_endpoint(
         transformed_data = process_hubspot_availability(
             hubspot_data,
             timezone,
-            apply_business_hours_filter
             # To make business hours configurable via API, add params here:
             # business_start_hour=custom_start_hour_param,
             # business_end_hour=custom_end_hour_param
