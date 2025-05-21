@@ -39,7 +39,6 @@ def is_within_business_hours(
 def process_hubspot_availability(
         hubspot_response_json: Dict[str, Any],
         target_timezone: str,
-        apply_business_hours_filter: bool = False,
         business_start_hour: int = 9,
         business_end_hour: int = 17,
         business_work_days: Optional[List[int]] = None
@@ -76,6 +75,8 @@ def process_hubspot_availability(
                 utc_dt = datetime.fromtimestamp(start_millis / 1000.0, tz=pytz.utc)
                 local_dt = utc_dt.astimezone(target_tz_obj)
 
+                # TODO(robert): Hide this behind a config flag
+                apply_business_hours_filter = False
                 if apply_business_hours_filter:
                     if not is_within_business_hours(
                             local_dt,
