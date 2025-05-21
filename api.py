@@ -5,13 +5,13 @@ from typing import Optional, Dict, List, Any
 import pytz  # Required: pip install pytz
 import requests
 from fastapi import FastAPI, Query, HTTPException
+import json
+from typing import Optional
+from pydantic import BaseModel
 
 
-# --- Environment Variable ---
-# Expected to be set in the environment: HUBSPOT_API_KEY
-# Example: export HUBSPOT_API_KEY="your_actual_hubspot_HUBSPOT_API_KEY"
 
-# --- Helper Functions (from the previous script) ---
+
 
 def convert_duration_ms_to_label(duration_ms_str: str) -> str:
     try:
@@ -222,6 +222,125 @@ async def get_availability_endpoint(
         # Catch-all for other unexpected errors
         print(f"An unexpected error occurred in /availability endpoint: {type(e).__name__} - {e}")
         raise HTTPException(status_code=500, detail="An unexpected internal server error occurred.")
+
+
+class BookingRequest(BaseModel):
+    slug: str
+    duration: str
+    timezone: str
+    slot: str
+    firstName: str
+    lastName: str
+    email: str
+    country: str
+    company: str
+
+
+@app.post("/book",
+          summary="Book a Meeting",
+          description="Books a meeting slot with the provided details via the HubSpot API.")
+async def book_meeting_endpoint(booking: BookingRequest):
+    HUBSPOT_API_KEY_from_env = os.getenv("HUBSPOT_API_KEY")
+    if not HUBSPOT_API_KEY_from_env:
+        raise HTTPException(status_code=500,
+                            detail="Server configuration error: HUBSPOT_API_KEY not set.")
+
+    # Parse the slot time and convert to milliseconds
+    try:
+        # Expected format: "Tuesday 2025-05-27 10:00"
+        slot_parts = booking.slot.split()
+        if len(slot_parts) < 3:
+            raise ValueError("Invalid slot format")
+
+        date_str = slot_parts[1]
+        time_str = slot_parts[2]
+
+        # Parse the datetime
+        dt_str = f"{date_str} {time_str}"
+        dt_obj = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+
+        # Create timezone aware datetime
+        tz_obj = pytz.timezone(booking.timezone)
+        local_dt = tz_obj.localize(dt_obj)
+
+        # Convert to UTC and then to milliseconds since epoch
+        utc_dt = local_dt.astimezone(pytz.UTC)
+        start_time_ms = int(utc_dt.timestamp() * 1000)
+    except (ValueError, IndexError) as e:
+        raise HTTPException(status_code=400,
+                            detail=f"Invalid slot format: {booking.slot}. Expected format: 'Day YYYY-MM-DD HH:MM'")
+
+    # Convert duration from "15min" to milliseconds
+    try:
+        duration_value = int(booking.duration.replace("min", ""))
+        duration_ms = duration_value * 60 * 1000
+    except ValueError:
+        raise HTTPException(status_code=400,
+                            detail=f"Invalid duration format: {booking.duration}. Expected format: '15min'")
+
+    # Prepare the payload for HubSpot API
+    hubspot_payload = {
+        "email": booking.email,
+        "lastName": booking.firstName,  # Note: There seems to be a swap in the example
+        "firstName": booking.lastName,  # The example shows these values swapped
+        "timezone": booking.timezone,
+        "startTime": str(start_time_ms),
+        "slug": booking.slug,
+        "duration": duration_ms,
+        "formFields": [
+            {"name": "country", "value": booking.country},
+            {"name": "company", "value": booking.company}],
+    }
+
+    # Send request to HubSpot API
+    url = "https://api.hubapi.com/scheduler/v3/meetings/meeting-links/book"
+    headers = {
+        "Authorization": f"Bearer {HUBSPOT_API_KEY_from_env}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(
+            url,
+            headers=headers,
+            data=json.dumps(hubspot_payload),
+            timeout=10
+        )
+        response.raise_for_status()  # Raises exception for 4XX/5XX responses
+
+        # Return the HubSpot API response
+        return response.json()
+
+    except requests.exceptions.HTTPError as e:
+        status_code = e.response.status_code
+        error_detail = f"Error from HubSpot API: Status {status_code}"
+
+        try:
+            # Try to parse error message from HubSpot
+            error_body = e.response.json()
+            if "message" in error_body:
+                error_detail += f" - {error_body['message']}"
+        except:
+            # If can't parse JSON, just include part of the response text
+            error_detail += f" - {e.response.text[:200]}"
+
+        if status_code == 401 or status_code == 403:
+            raise HTTPException(status_code=500, detail="HubSpot API authentication error")
+        else:
+            raise HTTPException(status_code=status_code, detail=error_detail)
+
+    except requests.exceptions.ConnectionError as errc:
+        raise HTTPException(status_code=503,
+                            detail=f"Service unavailable: Could not connect to HubSpot")
+
+    except requests.exceptions.Timeout as errt:
+        raise HTTPException(status_code=504,
+                            detail=f"Request to HubSpot timed out")
+
+    except Exception as e:
+        print(f"Unexpected error in /book endpoint: {type(e).__name__} - {e}")
+        raise HTTPException(status_code=500,
+                            detail="An unexpected error occurred while processing your booking request")
 
 
 # --- How to Run ---
